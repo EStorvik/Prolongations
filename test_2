@@ -1,0 +1,120 @@
+import sympy as sym
+
+from math import prod
+
+
+
+# Define symbols and functions
+x, y = sym.symbols('x y')
+
+u = sym.Function('u')(x, y)
+f = sym.Function('f')(x, y, u)
+v = sym.Function('v')(x, y, u)
+
+
+def D_base(f: sym.Function, x: sym.Symbol):
+    """Material derivative with simplification to notations"""
+    name = f.name
+    args = f.args
+    function_args = [arg for arg in args if isinstance(arg, sym.Function)]
+
+    x_name = x.name
+
+    # Derivate f with respect to x
+    Df_Dx = sym.diff(f, x)
+
+    # Make substitutions
+    if function_args == []:
+        u_x = sym.Function(f'{name}_{x_name}')(*args)
+        Df_Dx = Df_Dx.subs(sym.Derivative(f, x), u_x)
+
+    else:
+        for u in function_args:
+            u_name = u.name
+            u_args = u.args
+            
+            # u_x
+            u_x = sym.Function(f'{u_name}_{x.name}')(*u_args)
+            Df_Dx = Df_Dx.subs(sym.Derivative(u, x), u_x)
+
+            # f_u
+            f_u = sym.Function(f'{name}_{u_name}')(*args)
+            Df_Dx = Df_Dx.subs(sym.Derivative(f, u), f_u)
+
+            # f_x
+            f_x = sym.Function(f'{name}_{x_name}')(*args)
+            substitutions = {expr: f_x for expr in Df_Dx.atoms(sym.Subs)}
+            Df_Dx = Df_Dx.subs(substitutions)
+
+
+    return Df_Dx
+
+
+def D(f, x):
+    # Df_Dx: sym.Function = None
+    if isinstance(f, sym.Function):
+        return D_base(f, x)
+    elif isinstance(f, sym.Add):
+        args = f.args
+        return sum(D(arg, x) for arg in args)
+    elif isinstance(f, sym.Mul):
+        args = f.args
+        return sum(D(arg_d, x)*prod([arg_p for arg_p in args if arg_p != arg_d]) for arg_d in args)
+    elif isinstance(f, sym.Pow):
+        base, exp = f.args
+        return exp*sym.Pow(D(base, x), exp-1)
+    elif isinstance(f, sym.Integer):
+        return 0
+    else:
+        raise NotImplementedError(f'Function type {type(f)} not implemented') 
+
+
+def sort_derivatives(derivatives, args):
+    order = [arg.name for arg in args]
+    sorted_derivatives = []
+    for arg in order:
+        for derivative in derivatives:
+            if arg == derivative:
+                sorted_derivatives.append(derivative)
+    return sorted_derivatives
+
+
+def clean_base(f):
+    name_list = f.name.split('_')
+    derivatives = name_list[1:]
+    # Sort list of derivatives to ensure same order as args
+    sorted_derivatives = sort_derivatives(derivatives, f.args)
+    # Create new name
+    new_name = f'{name_list[0]}_{"".join(sorted_derivatives)}'
+    return sym.Function(new_name)(*f.args)
+
+def clean(f):
+    if isinstance(f, sym.Function):
+        return clean_base(f)
+    elif isinstance(f, sym.Add):
+        args = f.args
+        return sum(clean(arg) for arg in args)
+    elif isinstance(f, sym.Mul):
+        args = f.args
+        return prod([clean(arg) for arg in args])
+    elif isinstance(f, sym.Pow):
+        base, exp = f.args
+        return sym.Pow(clean(base), exp)
+    elif isinstance(f, sym.Integer):
+        return f
+    else:
+        raise NotImplementedError(f'Function type {type(f)} not implemented')
+
+
+Df_Dx = D(f, x)
+
+print(Df_Dx)
+
+DDf_Dxx = D(Df_Dx, x)
+
+print(sym.simplify(clean(DDf_Dxx)))
+
+DDDf_Dxxx = D(DDf_Dxx, x)
+DDDf_Dxxx = sym.simplify(clean(DDDf_Dxxx))
+
+print(DDDf_Dxxx)
