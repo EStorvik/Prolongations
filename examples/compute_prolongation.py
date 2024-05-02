@@ -19,5 +19,7 @@ d = d.subs(sym.Function("u_t")(x,t), sym.Function("u_xx")(x,t))
 
 monomials = prolongate.get_monomials(d)
 
+
+
 print(monomials)
 print(prolongate.output_to_latex(monomials))

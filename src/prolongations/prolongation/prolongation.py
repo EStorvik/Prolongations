@@ -3,8 +3,27 @@ import prolongations as pr
 import sympy as sym
 
 class Prolongation():
+    """
+    Prolongation class to compute vector field coefficients.
 
+    Takes us to the prolongation of the given system of PDEs and computes the vector field coefficients. 
+    There is still some manual work to be done in terms of translating the PDE, but this is WIP.
+    """
     def __init__(self, independent_variables: list[sym.Symbol], dependent_variables: list[sym.Function]) -> None:
+        """
+        Initialize the Prolongation object
+
+        args:
+            independent_variables: list[sym.Symbol] - list of independent variables
+            dependent_variables: list[sym.Function] - list of dependent variables
+
+        attributes:
+            independent_variables: list[sym.Symbol] - list of independent variables
+            dependent_variables: list[sym.Function] - list of dependent variables
+            xi: list[sym.Function] - list of xi functions
+            phi: list[sym.Function] - list of phi functions
+
+        """
         self.independent_variables = independent_variables
         self.dependent_variables = dependent_variables
 
@@ -12,6 +31,11 @@ class Prolongation():
 
 
     def get_monomials(self, expr) -> dict:
+        """
+        Computes a disctionary of monomials and their coefficients from a given expression.
+
+        Usefull for computing the vector field coefficients. This is the main important method.
+        """
 
         # Init output dictionary
         monomials = dict()
@@ -87,9 +111,19 @@ class Prolongation():
 
 
     def compute_vector_field_coefficient(self, derivative: list[int], dependent_variable_index: int):
+        """
+        Computes the vector field coefficient for a given derivative list of derivatives and dependent variable index.
+
+        args:
+            derivative: list[int] - list of derivatives in index form. Uses index in the self.independent_variables list.
+            dependent_variable_index: int - index of the dependent variable in the self.dependent_variables list.
+        """
         assert len(self.dependent_variables)>dependent_variable_index; "The dependent variable index is out of range"
+
+        # Get the dependent variable
         u: sym.Function = self.dependent_variables[dependent_variable_index]
         
+        # Compute the vector field coefficient
         body = self.phi[dependent_variable_index]
         for i, x in enumerate(self.independent_variables):
             body -= self.xi[i]*pr.D(u, x)
@@ -104,12 +138,16 @@ class Prolongation():
         for i, x in enumerate(self.independent_variables):
             phi+=self.xi[i]*pr.D(u_dd, x)
 
+        # Clean the expression
         phi = sym.simplify(pr.clean(phi))
         return phi
         
         
 
     def _init_vector_field_coefficients(self) -> tuple:
+        """
+        Initialize the xi and phi functions.
+        """
         xi = []
         phi = []
         for x in self.independent_variables:
@@ -119,20 +157,30 @@ class Prolongation():
         return xi, phi
     
     def output_to_latex(self, monomials: dict) -> str:
+        """
+        Output monomial dictionary to latex table.
+        """
+
+        # Create the table header
         output = "\\begin{table}[] \n \centering \n \\begin{tabular}{c|c} \n monomial & coefficient\\\\ \n \hline \n"
 
+        # Loop through the monomials and add them to the table
         for monomial, coefficient in monomials.items():
             coefficient = self._prepare_coefficient(coefficient)
             if monomial == '':
-                output += f'$1$ & {coefficient} \\\\ \n'
+                output += f'$1$ & ${coefficient}$ \\\\ \n'
             else:
                 monomial = self._prepare_monomial(monomial)
-                output += f'${monomial}$ & {coefficient} \\\\ \n'
-            
+                output += f'${monomial}$ & ${coefficient}$ \\\\ \n'
+        
+        # Close the table
         output += "\end{tabular}\n \caption{Caption}\n \label{tab:label}\n \end{table}"
         return output
 
     def _prepare_monomial(self, monomial: str) -> str:
+        """
+        Prepare the monomial for latex output.
+        """
         monomial_list = monomial.split("_")
         out_monomial = f"{monomial_list[0]}_"+"{"
         for m in monomial_list[1:]:
@@ -148,52 +196,85 @@ class Prolongation():
         return out_monomial
 
     def _is_dependent(self, t: str) -> bool:
+        """
+        Check if the given variable is dependent.
+        """
         for var in self.dependent_variables:
             if t == var.name:
                 return True
         return False
     
     def _prepare_coefficient(self, coefficient) -> str:
+        """
+        Prepare the coefficient for latex output.
+
+        Currently not properly implemented. WIP.
+        """
+        # Create the out coefficient string
         out_coefficient = ""
+
+        # Most likely the coefficient is an addition of terms
         if isinstance(coefficient, sym.Add):
             terms = coefficient.args
+            # Split the terms and loop through them to prepare them for latex output case by case
             for term in terms:
+                # If the term is a multiplication, split the factors and loop through them
                 if isinstance(term, sym.Mul):
                     factors = term.args
                     for factor in factors:
+                        # If it is an integer, just add it to the coefficient as a string
                         if isinstance(factor, sym.Integer):
                             out_coefficient += f"{factor}"
-                        elif isinstance(factor, sym.core.numbers.NegativeOne):
-                            out_coefficient = out_coefficient[:len(out_coefficient)-1]
-                            out_coefficient += "-"
-                        elif isinstance(factor, sym.Function):
+                        # If it is another function, prepare it for latex output and add as a string
+                        else:
                             factor_name = self._prepare_function(factor)
                             out_coefficient += factor_name
-                elif isinstance(coefficient, sym.Function):
+#                        else:
+#                           raise NotImplementedError(f'Factor type {type(factor)} not implemented')
+                # If the term is a function, prepare it for latex output and add as a string
+                else:
                     factor_name = self._prepare_function(factor)
                     out_coefficient += factor_name
-                else:
-                    raise NotImplementedError(f'Factor type {type(factor)} not implemented')
+                #else:
+                #    raise NotImplementedError(f'Factor type {type(factor)} not implemented')
                 out_coefficient += "+"
+        # If the coefficient is a multiplication, split the factors and loop through them.
         elif isinstance(coefficient, sym.Mul):
             factors = coefficient.args
             for factor in factors:
                 if isinstance(factor, sym.Integer):
                     out_coefficient += f"{factor}"
-                elif isinstance(factor, sym.core.numbers.NegativeOne):
-                    out_coefficient = out_coefficient[:len(out_coefficient)-1]
-                    out_coefficient += "-"
-                elif isinstance(factor, sym.Function):
+                else:
                     factor_name = self._prepare_function(factor)
                     out_coefficient += factor_name
-                else:
-                    raise NotImplementedError(f'Factor type {type(factor)} not implemented')
-        elif isinstance(coefficient, sym.Function):
+                #else:
+                #    raise NotImplementedError(f'Factor type {type(factor)} not implemented')
+        else:
             factor_name = self._prepare_function(coefficient)
             out_coefficient += factor_name
-        else:
-            raise NotImplementedError(f'Factor type {type(coefficient)} not implemented')
+        #else:
+        #    raise NotImplementedError(f'Factor type {type(coefficient)} not implemented')
+        out_coefficient = self._clean_double_plus(out_coefficient)
         return out_coefficient        
+
+    def _clean_double_plus(self, string: str) -> str:
+        """
+        Clean the double plus signs from the string.
+        """
+        # Replace double plus
+        out_string = string.replace("++", "+")
+        # Replace plus minus
+        out_string = out_string.replace("+-", "-")
+
+        # Remove leading and trailing plus signs
+        if out_string[0] == "+":
+            out_string = out_string[1:]
+        if out_string[-1] == "+":
+            out_string = out_string[:-1]
+
+        #replace multiplication by one
+        out_string = out_string.replace("1", "")
+        return out_string
 
     def _prepare_function(self, factor) -> str:
         factor_name = factor.name
