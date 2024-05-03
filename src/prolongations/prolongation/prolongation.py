@@ -96,6 +96,9 @@ class Prolongation():
             else:
                 raise NotImplementedError(f'Term type {type(term)} not implemented')
             
+        # Remove duplicates
+        monomials = self._remove_duplicates(monomials)
+            
         return monomials
 
 
@@ -229,14 +232,11 @@ class Prolongation():
                         else:
                             factor_name = self._prepare_function(factor)
                             out_coefficient += factor_name
-#                        else:
-#                           raise NotImplementedError(f'Factor type {type(factor)} not implemented')
                 # If the term is a function, prepare it for latex output and add as a string
                 else:
-                    factor_name = self._prepare_function(factor)
+                    factor_name = self._prepare_function(term)
                     out_coefficient += factor_name
-                #else:
-                #    raise NotImplementedError(f'Factor type {type(factor)} not implemented')
+
                 out_coefficient += "+"
         # If the coefficient is a multiplication, split the factors and loop through them.
         elif isinstance(coefficient, sym.Mul):
@@ -254,10 +254,10 @@ class Prolongation():
             out_coefficient += factor_name
         #else:
         #    raise NotImplementedError(f'Factor type {type(coefficient)} not implemented')
-        out_coefficient = self._clean_double_plus(out_coefficient)
+        out_coefficient = self._clean_string(out_coefficient)
         return out_coefficient        
 
-    def _clean_double_plus(self, string: str) -> str:
+    def _clean_string(self, string: str) -> str:
         """
         Clean the double plus signs from the string.
         """
@@ -285,3 +285,19 @@ class Prolongation():
         subscript = factor_name_list[1]
 
         return "\\"+function+"_"+"{"+subscript+"}^"+exponent
+
+    # Method to remove duplicate entries in monomial dictionary
+    def _remove_duplicates(self, monomials: dict) -> dict:
+        """
+        Remove duplicate entries in the monomial dictionary.
+        """
+        sorted_monomials = dict()
+        for key, value in monomials.items():
+            duplicate = False
+            for k, v in sorted_monomials.items():
+                if value == v:
+                    duplicate = True
+                    break
+            if not duplicate:
+                sorted_monomials[key] = value
+        return sorted_monomials
